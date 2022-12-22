@@ -285,3 +285,174 @@ select a.*
                 and c.country_name = 'Italy'
         ) b
     where a.month_avg > b.year_avg;
+    
+--복잡한 쿼리 작성법
+--    ex. 연도별로 이탈리아 매출 데이터를 살펴 매출실적이 가장 많은 사원 목록과 매출액 구하는 쿼리
+--    1. 최종적으로 조회되는 결과 항목을 정의한다.
+--        출력항목 : 연도, 최대매출사원명, 최대매출액
+--    2. 필요한 테이블
+--        이탈리아 찾기 : countries
+--        이탈리아 고객 찾기 : customers
+--        매출 : sales
+--        사원정보 : employees
+--    3. 단위 분할
+--        (1) 연도, 사원별 이탈리아 매출액 구하기
+--            이탈리아 고객 찾기 : customers, countries를 country_id로 조인, country_name이 'Italy'인 것 찾기
+--            이탈리아 매출 찾기 : 위 결과와 sales 테이블을 cust_id로 조인
+--            최대 매출액을 구하려면 max 함수를 쓰고, 연도별로 group by 필요
+
+            SELECT
+                substr(a.sales_month,1,4) AS years,
+                a.employee_id,
+                SUM(a.amount_sold) AS amount_sold
+            FROM
+                sales a,
+                customers b,
+                countries c
+            WHERE
+                a.cust_id = b.cust_id
+                AND b.country_id = c.country_id
+                AND c.country_name = 'Italy'
+            GROUP BY
+                substr(a.sales_month,1,4),
+                a.employee_id;
+                
+--         (2) (1)에서 구한 결과에 연도별 최대, 최소 매출액 구하기
+            SELECT
+                years,
+                MAX(amount_sold) AS max_sold
+            FROM
+                (
+                    SELECT
+                        substr(a.sales_month,1,4) AS years,
+                        a.employee_id,
+                        SUM(a.amount_sold) AS amount_sold
+                    FROM
+                        sales a,
+                        customers b,
+                        countries c
+                    WHERE
+                        a.cust_id = b.cust_id
+                        AND b.country_id = c.country_id
+                        AND c.country_name = 'Italy'
+                    GROUP BY
+                        substr(a.sales_month,1,4),
+                        a.employee_id
+                ) k
+            GROUP BY
+                years
+            ORDER BY
+                years;
+                
+--          (3) (1)의 결과와 (2)의 결과를 조인해서 최대매출, 최소매출액을 일으킨 사원을 찾아야 하므로,
+--              (1)과 (2) 결과를 인라인 뷰로 만든다.
+            SELECT
+                emp.years,
+                emp.employee_id,
+                emp.amount_sold
+            FROM
+                (
+                    SELECT
+                        substr(a.sales_month,1,4) AS years,
+                        a.employee_id,
+                        SUM(a.amount_sold) AS amount_sold
+                    FROM
+                        sales a,
+                        customers b,
+                        countries c
+                    WHERE
+                        a.cust_id = b.cust_id
+                        AND b.country_id = c.country_id
+                        AND c.country_name = 'Italy'
+                    GROUP BY
+                        substr(a.sales_month,1,4),
+                        a.employee_id
+                ) emp,
+                (
+                    SELECT
+                        years,
+                        MAX(amount_sold) AS max_sold
+                    FROM
+                        (
+                            SELECT
+                                substr(a.sales_month,1,4) AS years,
+                                a.employee_id,
+                                SUM(a.amount_sold) AS amount_sold
+                            FROM
+                                sales a,
+                                customers b,
+                                countries c
+                            WHERE
+                                a.cust_id = b.cust_id
+                                AND b.country_id = c.country_id
+                                AND c.country_name = 'Italy'
+                            GROUP BY
+                                substr(a.sales_month,1,4),
+                                a.employee_id
+                        ) k
+                    GROUP BY
+                        years
+                ) sale
+            WHERE
+                emp.years = sale.years
+                AND emp.amount_sold = sale.max_sold
+            ORDER BY
+                years;
+                
+--          (4) 마지막으로 (3) 결과와 사원 테이블을 조인해서 사원 이름을 가져온다.                
+                
+            SELECT
+                emp.years,
+                emp.employee_id,
+                emp2.emp_name,
+                emp.amount_sold
+            FROM
+                (
+                    SELECT
+                        substr(a.sales_month,1,4) AS years,
+                        a.employee_id,
+                        SUM(a.amount_sold) AS amount_sold
+                    FROM
+                        sales a,
+                        customers b,
+                        countries c
+                    WHERE
+                        a.cust_id = b.cust_id
+                        AND b.country_id = c.country_id
+                        AND c.country_name = 'Italy'
+                    GROUP BY
+                        substr(a.sales_month,1,4),
+                        a.employee_id
+                ) emp,
+                (
+                    SELECT
+                        years,
+                        MAX(amount_sold) AS max_sold
+                    FROM
+                        (
+                            SELECT
+                                substr(a.sales_month,1,4) AS years,
+                                a.employee_id,
+                                SUM(a.amount_sold) AS amount_sold
+                            FROM
+                                sales a,
+                                customers b,
+                                countries c
+                            WHERE
+                                a.cust_id = b.cust_id
+                                AND b.country_id = c.country_id
+                                AND c.country_name = 'Italy'
+                            GROUP BY
+                                substr(a.sales_month,1,4),
+                                a.employee_id
+                        ) k
+                    GROUP BY
+                        years
+                ) sale,
+                employees emp2
+            WHERE
+                emp.years = sale.years
+                AND emp.amount_sold = sale.max_sold
+                AND emp.employee_id = emp2.employee_id
+            ORDER BY
+                years;

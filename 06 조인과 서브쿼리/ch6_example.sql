@@ -107,6 +107,140 @@ where a.cust_id = b.cust_id
 group by substr(a.sales_month, 1, 4), a.employee_id;
 
 -- 1 결과에서 연도별 최대, 최소 매출액 구하기
--- 1,2 조인해서 최대매출, 최소 매출 사원 찾기
--- 3결과와 사원 테이블 조인해서 사원 이름 가져오기
+select years,
+    max(amount_sold) as max_sold
+    , min(amount_sold) as min_sold
+from (select substr(a.sales_month, 1, 4) as years,
+            a.employee_id, sum(a.amount_sold) as amount_sold
+        from sales a,
+            customers b,
+            countries c
+        where a.cust_id = b.cust_id
+            and b.country_id = c.country_id
+            and c.country_name = 'Italy'
+        group by substr(a.sales_month, 1, 4), a.employee_id) k
+group by years
+order by years;
 
+-- 1,2 조인해서 최대매출, 최소 매출 사원 찾기
+select emp.years, 
+    emp.employee_id, 
+    emp.amount_sold
+from ( select substr(a.sales_month, 1, 4) as years,
+            a.employee_id, sum(a.amount_sold) as amount_sold
+        from sales a,
+            customers b,
+            countries c
+        where a.cust_id = b.cust_id
+            and b.country_id = c.country_id
+            and c.country_name = 'Italy'
+        group by substr(a.sales_month, 1, 4), a.employee_id
+    ) emp,
+    ( select years, 
+            max(amount_sold) as max_sold,
+            min(amount_sold) as min_sold
+        from ( select substr(a.sales_month, 1, 4) as years,
+                    a.employee_id,
+                    sum(a.amount_sold) as amount_sold
+                from sales a,
+                    customers b,
+                    countries c
+                where a.cust_id = b.cust_id
+                    and b.country_id = c.country_id
+                    and c.country_name = 'Italy'
+                group by substr(a.sales_month, 1, 4), a.employee_id
+            ) K
+        group by years
+    ) sale
+where emp.years = sale.years
+    and (emp.amount_sold = sale.max_sold or emp.amount_sold = sale.min_sold)
+--    and emp.amount_sold = sale.max_sold
+--    and emp.amount_sold = sale.min_sold
+order by years;
+
+
+-- 3결과와 사원 테이블 조인해서 사원 이름 가져오기
+select emp.years, 
+    emp.employee_id,
+    emp2.emp_name,
+    emp.amount_sold
+from ( select substr(a.sales_month, 1, 4) as years,
+            a.employee_id, sum(a.amount_sold) as amount_sold
+        from sales a,
+            customers b,
+            countries c
+        where a.cust_id = b.cust_id
+            and b.country_id = c.country_id
+            and c.country_name = 'Italy'
+        group by substr(a.sales_month, 1, 4), a.employee_id
+    ) emp,
+    ( select years, 
+            max(amount_sold) as max_sold,
+            min(amount_sold) as min_sold
+        from ( select substr(a.sales_month, 1, 4) as years,
+                    a.employee_id,
+                    sum(a.amount_sold) as amount_sold
+                from sales a,
+                    customers b,
+                    countries c
+                where a.cust_id = b.cust_id
+                    and b.country_id = c.country_id
+                    and c.country_name = 'Italy'
+                group by substr(a.sales_month, 1, 4), a.employee_id
+            ) K
+        group by years
+    ) sale,
+    employees emp2
+where emp.years = sale.years
+    and (emp.amount_sold = sale.max_sold or emp.amount_sold = sale.min_sold)
+    and emp.employee_id = emp2.employee_id
+order by years;
+
+-- 1998 최솟값 어디갔냐......
+-- employees 테이블에 없어서 그렇대
+
+select years,
+    max(amount_sold) as max_sold
+    , min(amount_sold) as min_sold
+from (select substr(a.sales_month, 1, 4) as years,
+            a.employee_id, sum(a.amount_sold) as amount_sold
+        from sales a,
+            customers b,
+            countries c
+        where a.cust_id = b.cust_id
+            and b.country_id = c.country_id
+            and c.country_name = 'Italy'
+        group by substr(a.sales_month, 1, 4), a.employee_id) k
+where years = 1998
+group by years
+order by years;
+
+select substr(a.sales_month, 1, 4) as years,
+            a.employee_id, sum(a.amount_sold) as amount_sold
+        from sales a,
+            customers b,
+            countries c
+        where a.cust_id = b.cust_id
+            and b.country_id = c.country_id
+            and c.country_name = 'Italy'
+        group by substr(a.sales_month, 1, 4), a.employee_id
+        order by years;
+        
+        
+select a.years, a.employee_id, a.amount_sold
+from ( SELECT SUBSTR(a.sales_month, 1, 4) as years,
+                a.employee_id, 
+                SUM(a.amount_sold) AS amount_sold
+           FROM sales a,
+                customers b,
+                countries c
+          WHERE a.cust_id = b.CUST_ID
+            AND b.country_id = c.COUNTRY_ID
+            AND c.country_name = 'Italy'     
+          GROUP BY SUBSTR(a.sales_month, 1, 4), a.employee_id) a 
+                , employees emp2
+where a.employee_id = emp2.employee_id
+  ORDER BY years;
+  
+select * from sales;
+select * from EMPLOYEES;

@@ -113,3 +113,204 @@ select department_id, lpad(' ', 3 * (level-1)) || department_name, level,
     from departments
     start with parent_id is null
     connect by prior department_id = parent_id;
+    
+select department_id, LPAD(' ', 3 * (LEVEL-1)) || department_name, LEVEL,
+        sys_CONNECT_BY_PATH(department_name, '|')
+    from departments
+    start with parent_id is null
+    connect by prior department_id = parent_id;
+    
+select department_id, lpad(' ', 3 * (level-1)) || department_name, level,
+        connect_by_iscycle isloop,
+        parent_id
+    from departments
+    start with department_id = 30
+    connect by nocycle prior department_id = parent_id;
+    
+-- 계층형 쿼리 응용
+create table ex7_1 as
+    select rownum seq,
+        '2014' || LPAD(CEIL(rownum/1000), 2, '0') month,
+        round(dbms_random.value(100, 1000)) amt
+    from dual
+connect by level <= 12000;  -- 명시한 숫자만큼의 로우 반환
+
+select * 
+    from ex7_1;
+    
+select month, sum(amt)
+    from ex7_1
+    group by month
+    order by month;
+    
+select rownum
+    from ( 
+        select 1 as row_num
+            from dual
+            union all
+            select 1 as row_num
+                from dual
+        )
+    connect by level <= 4;
+    
+create table ex7_2 as
+    select department_id,
+        listagg(emp_name, ', ') within group (order by emp_name) as empnames
+    from employees
+    where department_id is not null
+    group by department_id;
+    
+select * from ex7_2;
+
+select empnames,
+    level as lvl
+from ( select empnames || ',' as empnames,
+            length(empnames) ori_len,
+            length (replace(empnames, ',', '')) new_len
+        from ex7_2
+        where department_id = 90
+        )
+connect by level <= ori_len - new_len + 1;
+
+select empnames, 
+        decode(level, 1, 1, instr(empnames, ',', 1, level-1)) start_pos,
+        instr(empnames, ',', 1, level) end_pos,
+        level as lvl
+    from ( select empnames || ',' as empnames,
+                length(empnames) ori_len,
+                length(replace(empnames, ',', '')) new_len
+            from ex7_2
+            where department_id = 90
+            )
+    connect by level <= ori_len - new_len + 1;
+    
+select replace (substr(empnames, start_pos, end_pos - start_pos), ',', '') as emp
+    from (select empnames,
+                decode(level, 1, 1, instr(empnames, ',', 1, level-1)) start_pos,
+                instr(empnames, ',', 1, level) end_pos,
+                level as lvl
+            from ( select empnames || ',' as empnames,
+                        length(empnames) ori_len,
+                        length(replace(empnames, ',', '')) new_len
+                    from ex7_2
+                    where department_id = 90
+                )
+            connect by level <= ori_len - new_len + 1
+        );
+        
+-- with절
+
+select b2.*
+from ( select period, region, sum(loan_jan_amt) jan_amt
+        from kor_loan_status
+        group by period, region
+        ) b2,
+        ( select b.period, max(b.jan_amt) max_jan_amt
+            from ( select period, region, sum(loan_jan_amt) jan_amt
+                    from kor_loan_status
+                    group by period, region
+                    ) b, 
+                    ( select max(period) max_month
+                        from kor_loan_status
+                        group by substr(period, 1, 4)
+                    ) a
+            where b.period = a.max_month
+            group by b.period
+        ) c
+    where b2.period = c.period
+        and b2.jan_amt = c.max_jan_amt
+    order by 1;
+    
+with b2 as (select period, region, sum(loan_jan_amt) jan_amt
+            from kor_loan_status
+            group by period, region
+            ),
+    c as (select b.period, max(b.jan_amt) max_jan_amt
+            from ( select period, region, sum(loan_jan_amt) jan_amt
+                    from kor_loan_status
+                    group by period, region
+                    ) b,
+                    (select max(period) max_month
+                        from kor_loan_status
+                        group by substr(period, 1, 4)
+                    ) a
+            where b.period = a.max_month
+            group by b.period
+            )
+    select b2.*
+        from b2, c
+        where b2.period = c.period
+        and b2.jan_amt = c.max_jan_amt
+        order by 1;
+        
+with b2 as (select period, region, sum(loan_jan_amt) jan_amt
+            from kor_loan_status
+            group by period, region
+            ),
+    c as (select b2.period, max(b2.jan_amt) max_jan_amt
+            from b2,
+                (select max(period) max_month
+                    from kor_loan_status
+                    group by substr(period, 1, 4)
+                ) a
+            where b2.period = a.max_month
+            group by b2.period
+            )
+    select b2.*
+        from b2, c
+        where b2.period = c.period
+        and b2.jan_amt = c.max_jan_amt
+        order by 1;
+        
+-- 순환 서브쿼리
+select department_id, lpad(' ', 3 * (level-1)) || department_name, level
+    from departments
+    start with parent_id is null
+    connect by prior department_id = parent_id;
+    
+with recur( department_id, parent_id, department_name, lvl)
+        as ( select department_id, parent_id, department_name, 1 as lvl
+                from departments
+                where parent_id is null     -- start with parent_id is null과 같음
+                union all
+                select a.department_id, a.parent_id, a.department_name, b.lvl + 1
+                    from departments a, recur b
+                    where a.parent_id = b.department_id 
+                            -- connect by prior department_id = parent_id와 같음
+            )
+    select department_id, lpad(' ', 3 * (lvl-1)) || department_name, lvl
+        from recur;
+        
+with recur ( department_id, parent_id, department_name, lvl)
+        as ( select department_id, parent_id, department_name, 1 as lvl
+                from departments
+                where parent_id is null
+                union all
+                select a.department_id, a.parent_id, a.department_name, b.lvl + 1
+                    from departments a, recur b
+                    where a.parent_id = b.department_id
+            )
+    search depth first by department_id set order_seq
+--    search breadth first by department_id set order_seq   -- 레벨 순서대로 조회
+    select department_id, lpad(' ', 3 * (lvl-1)) || department_name, lvl, order_seq
+        from recur;
+        
+-- 분석함수
+
+select department_id, emp_name,
+    row_number() over (partition by department_id
+                        order by department_id, emp_name) dep_rows
+    from employees;
+    
+select department_id, emp_name, 
+    salary, 
+    rank() over (partition by department_id
+                order by salary) dep_rank
+    from employees;
+    
+select department_id, emp_name, 
+    salary, 
+    dense_rank() over (partition by department_id   -- 순위 건너뛰지 않고
+                order by salary) dep_rank
+    from employees;
+    

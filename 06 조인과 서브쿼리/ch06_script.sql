@@ -151,7 +151,7 @@ insert into hong_b values ( 10);
 insert into hong_b values ( 20);
 insert into hong_b values ( 30);
 
-commit;
+-- commit;
 
 select a.emp_id, b.emp_id
     from hong_a a,

@@ -162,3 +162,49 @@ select seq, goods
     select seq, goods
         from exp_goods_asia
         where country = '일본';
+        
+select seq, goods
+    from exp_goods_asia
+    where country = '한국'
+    INTERSECT
+    select seq, goods
+        from exp_goods_asia
+        where country = '일본';
+        
+select seq
+    from exp_goods_asia
+    where country = '한국'
+    union
+    select goods            -- (X) 데이터 타입 같아야
+        from exp_goods_asia
+        where country = '일본';
+        
+select goods
+    from exp_goods_asia
+    where country = '한국'
+    order by goods      -- (X) order by절은 맨 마지막 문장에서만 사용
+    union
+    select goods
+        from exp_goods_asia
+        where country = '일본';
+        
+select goods
+    from exp_goods_asia
+    where country = '한국'
+    union
+    select goods
+        from exp_goods_asia
+        where country = '일본'
+        order by goods;
+        
+-- grouping sets절
+select period, gubun, sum(loan_jan_amt) totl_jan
+    from kor_loan_status
+    where period like '2013%'
+    group by grouping sets(period, gubun);
+    
+select period, gubun, region, sum(loan_jan_amt) totl_jan
+    from kor_loan_status
+    where period like '2013%'
+        and region in ('서울', '경기')
+    group by grouping sets(period, (gubun, region));

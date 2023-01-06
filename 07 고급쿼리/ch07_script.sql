@@ -609,4 +609,3 @@ insert first
     select department_id, employee_id, emp_name, salary
         from employees
         where department_id = 30;
-        
